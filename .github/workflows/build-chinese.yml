@@ -1,0 +1,66 @@
+name: Build Chinese FireRed and LeafGreen
+
+on:
+  push:
+    branches:
+      - chinese
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    env:
+      GAME_LANGUAGE: ENGLISH
+      GAME_REVISION: 0
+      MODERN: 0
+      COMPARE: 0
+    steps:
+      - name: Checkout Chinese source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Checkout agbcc
+        uses: actions/checkout@v4
+        with:
+          repository: pret/agbcc
+          path: agbcc
+          persist-credentials: false
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential binutils-arm-none-eabi libpng-dev pkg-config
+
+      - name: Build and install agbcc
+        working-directory: agbcc
+        run: |
+          ./build.sh
+          ./install.sh ../
+
+      - name: Compile FireRed
+        run: make -j2 GAME_VERSION=FIRERED
+
+      - name: Compile LeafGreen
+        run: make -j2 GAME_VERSION=LEAFGREEN
+
+      - name: Verify ROM outputs
+        run: |
+          test -s pokefirered.gba
+          test -s pokeleafgreen.gba
+          sha1sum pokefirered.gba pokeleafgreen.gba > SHA1SUMS.txt
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: PretFRLG-chinese
+          path: |
+            pokefirered.gba
+            pokeleafgreen.gba
+            SHA1SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
